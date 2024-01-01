@@ -1,0 +1,65 @@
+##################################################
+## disable swap
+##################################################
+- name: fstab idempotency register
+  shell: cat /etc/fstab | grep '#/swap.img'
+  register: swap_commentout
+  failed_when: swap_commentout.rc not in [0, 1]
+- name: comment out swap fstab
+  lineinfile:
+    path: '/etc/fstab'
+    state: 'present'
+    backrefs: 'yes'
+    regexp: '^(.*swap.*)$'
+    line: '#\1'
+  when: swap_commentout.stdout == ""
+  register: deactivate_swap
+- name: turn off swap
+  shell: |
+    swapoff -a
+    systemctl mask "swap.img.swap"
+    systemctl daemon-reload
+  when: deactivate_swap is changed
+  register: swapmask
+- name: reboot
+  reboot:
+  when: swapmask is changed
+
+##################################################
+## synchronizing NTP and locale settings
+##################################################
+- name: timesyncd.conf idempotency register
+  shell: cat /etc/systemd/timesyncd.conf | grep 'ntp.nict.jp'
+  register: timesyncd_commentout
+  failed_when: timesyncd_commentout.rc not in [0, 1]
+- name: NTP settings in /etc/systemd/timesyncd.conf
+  replace:
+    dest: /etc/systemd/timesyncd.conf
+    regexp: '#NTP='
+    replace: 'NTP=ntp.nict.jp'
+  when: timesyncd_commentout.stdout == ""
+  register: ntp_settings
+- name: set timezone
+  timezone:
+    name: Asia/Tokyo
+  when: ntp_settings is changed
+- name: activate timesyncd
+  shell: timedatectl set-ntp true
+  when: ntp_settings is changed
+
+- name: locale idempotency register
+  shell: locale | grep 'ja_JP.UTF-8'
+  register: current_locale
+  failed_when: current_locale.rc not in [0, 1]
+- name: install language-pack-ja
+  apt:
+    name: language-pack-ja
+    state: present
+- name: create locale ja_JP.UTF-8
+  locale_gen:
+    name: ja_JP.UTF-8
+  when: current_locale.stdout == ""
+- name: change locale
+  command: update-locale LANG=ja_JP.UTF-8
+  when: current_locale.stdout == ""
+

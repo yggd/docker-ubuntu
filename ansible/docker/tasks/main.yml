@@ -1,0 +1,63 @@
+##################################################
+##  install Docker CE
+##################################################
+- name: delete old docker package
+  apt:
+    pkg:
+      - docker.io
+      - docker-compose
+      - docker-compose-v2
+      - docker-doc
+      - podman-docker
+      - containerd
+      - runc
+    state: absent
+- name: install aptitude (& apt update)
+  apt:
+    name: aptitude
+    state: latest
+    update_cache: true
+- name: install required system packages
+  apt:
+    pkg:
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+    state: latest
+- name: add docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+- name: add docker repository
+  apt_repository:
+    repo: deb https://download.docker.com/linux/ubuntu jammy stable
+    update_cache: true
+    state: present
+- name: install docker-ce
+  apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: latest
+- name: add the user 'vagrant' with a specific uid and a primary group of 'docker'
+  user:
+    name: vagrant
+    comment: docker execution user
+    group: docker
+- name: start containerd
+  systemd:
+    name: containerd
+    state: restarted
+    daemon_reload: yes
+    enabled: yes
+- name: start dockerd
+  systemd:
+    name: docker
+    state: started
+    daemon_reload: yes
+    enabled: yes
+

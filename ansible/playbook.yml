@@ -1,0 +1,7 @@
+- name: docker-ce provision common
+  hosts: all
+  gather_facts: true
+  become: true
+  roles:
+    - setup
+    - docker
